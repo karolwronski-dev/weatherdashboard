@@ -31,8 +31,25 @@ def main():
     current_temperature_2m = current.Variables(0).Value()
     current_relative_humidity_2m = current.Variables(1).Value()
     print(f"Current time: {datetime.fromtimestamp(current.Time())}")
-    print(f"Current temperature_2m: {current_temperature_2m}")
-    print(f"Current relative_humidity_2m: {current_relative_humidity_2m}")
+    print(f"Current temperature: {current_temperature_2m}")
+
+    # Process hourly data. The order of variables needs to be the same as requested.
+    hourly = response.Hourly()
+    hourly_temperature_2m = hourly.Variables(0).ValuesAsNumpy()
+
+    hourly_data = {"date": pd.date_range(
+        start=pd.to_datetime(hourly.Time(), unit="s", utc=True),
+        end=pd.to_datetime(hourly.TimeEnd(), unit="s", utc=True),
+        freq=pd.Timedelta(seconds=hourly.Interval()),
+        inclusive="left"
+    )}
+
+    hourly_data['date'] = hourly_data['date'].strftime(
+        "%d %b, %H:%M")
+    hourly_data["temperature"] = hourly_temperature_2m
+    hourly_dataframe = pd.DataFrame(data=hourly_data)
+
+    print(f"\nDashboard for: {city_name}\n\n", hourly_dataframe)
 
 
 if __name__ == "__main__":
