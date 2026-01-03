@@ -75,7 +75,7 @@ def display_city_weather(city, response):
 
     print(f"\nDashboard for: {city}")
     print(f"Current time: {datetime.fromtimestamp(current.Time())}")
-    print(f"Current temperature: {current_temperature_2m}")
+    print(f"Current temperature: {round(current_temperature_2m)}°C")
 
     hourly = response.Hourly()
     hourly_temperature_2m = hourly.Variables(0).ValuesAsNumpy()
@@ -87,17 +87,27 @@ def display_city_weather(city, response):
         inclusive="left"
     )}
 
-    hourly_data['date'] = hourly_data['date'].strftime("%d %b, %H:%M")
     hourly_data["temperature"] = hourly_temperature_2m
-
     hourly_df = pd.DataFrame(data=hourly_data)
-    hourly_df = hourly_df.set_index('date').T
+
+    today = pd.Timestamp.now(tz='UTC').normalize()
+
+    hourly_df = hourly_df[hourly_df['date'].dt.normalize() == today].copy()
+    hourly_df['date'] = hourly_df['date'].dt.strftime("  %H:%M  ")
+
+    hourly_df = hourly_df.set_index("date")
+    hourly_df.index.name = today.strftime("%d %b")
+    hourly_df['temperature'] = hourly_df['temperature'].apply(
+        lambda x: f"{x:.1f}°C")
+
+    hourly_df = hourly_df.T
 
     print("\n", hourly_df)
 
 
 def start():
-    is_first_time, user_name, city_name = get_user_info()
+    is_first_time, user_name, main_city = get_user_info()
+    is_running = True
 
     if is_first_time:
         print(f"Nice to meet You, {user_name}! Let me configure dashboard...")
@@ -106,12 +116,22 @@ def start():
 
     openmeteo = connect()
 
-    cities = [city_name]
+    lat, lon = get_city_coordinates(main_city)
+    response = fetch_forecast(openmeteo, lat, lon)
+    display_city_weather(main_city, response)
 
-    for city in cities:
-        lat, lon = get_city_coordinates(city)
-        response = fetch_forecast(openmeteo, lat, lon)
-        display_city_weather(city, response)
+    while (is_running):
+        another_city = input(f"{user_name}, write another city or leave (q): ")
+        if (another_city == "q"):
+            is_running = False
+            break
+        else:
+            lat, lon = get_city_coordinates(another_city)
+            if (lat != None and lon != None):
+                response = fetch_forecast(openmeteo, lat, lon)
+                display_city_weather(another_city, response)
+            else:
+                print(f"Cant find city: {another_city}")
 
 
 if __name__ == "__main__":
